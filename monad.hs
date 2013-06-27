@@ -37,13 +37,13 @@ defOptions = FromRedditOptions {
 	modhash = ""}
 
 --rawToBrowserAction :: FromRedditOptions -> Reddit a -> StdBrowserAction a
-rawToBrowserAction ops = flip evalStateT (modhash ops) . retract . hoistFree (hoist (modifier ops) . runner)
+customToBrowserAction ops = flip evalStateT (modhash ops) . retract . hoistFree (hoist (modifier ops) . runner)
 	where
 		runner (Interaction input f) = get >>= \modhash -> (lift . fmap f . actionR modhash $ input)
 		runner (SetModhash m e) = put m >> return e
 
 {--}
-toBrowserAction = rawToBrowserAction defOptions
+toBrowserAction = customToBrowserAction defOptions
 customPerformReddit initializer ops = browse . (initializer>>) . rawToBrowserAction ops
 
 -- Test zone
@@ -64,4 +64,4 @@ initializer = do
 	setAllowRedirects True
 	setUserAgent "haskell reddit API writer, still in early development"
 
-main = print =<< customPerformReddit initializer defOptions testAction--}
+main = print =<< customPerformReddit initializer defOptions testAction
