@@ -1,0 +1,14 @@
+TODO:
+
+ContentInfo: edited
+Link: clicked, hidden, media, media_embed, link_created
+Comment: comment_created
+Distintion should be improved
+"More" objects are not extracted
+LinkWithComment's interpretR needs serious refactoring
+Non-informative interactions should have a better return type than plain Values
+
+Posting functionality is not added
+Various information functionality is also missing
+
+Strings should be avoided
