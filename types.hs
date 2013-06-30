@@ -16,6 +16,9 @@ instance Show (RedditName Link) where
 instance Show (RedditName Comment) where
    show (RedditName i) = "t1_"++i
 
+instance Show (RedditName User) where
+	show (RedditName i) = "t2_"++i
+
 instance Show (RedditName ()) where
 	show = getName
 
@@ -41,7 +44,7 @@ type Distintion = String -- to be improved
 
 data Comment = Comment {
 	approved_by :: Maybe String,
-	comment_fullname :: RedditName Comment,
+	comment_name :: RedditName Comment,
     comment_info :: ContentInfo,
     comment_votes :: Votes,
     --comment_created :: CreatedInfo,
@@ -72,5 +75,22 @@ data Link = Link {
 	selftext :: Maybe (String, String),
 	thumbnail :: String,
 	url :: String} deriving Show
+
+data User = User {
+	user_name :: RedditName User,
+	user_comment_karma :: Int,
+	--created
+	--created_utc
+	has_mail :: Maybe Bool,
+	has_mod_mail :: Maybe Bool,
+	has_verified_email :: Bool,
+	is_friend :: Bool,
+	is_gold :: Bool,
+	is_mod :: Bool,
+	user_link_karma :: Int,
+	user_modhash :: Maybe Modhash,
+	name :: String,
+	over_18 :: Bool}
+	
 
 type Modhash = String

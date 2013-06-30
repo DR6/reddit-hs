@@ -98,8 +98,7 @@ instance RedditInteraction LinkWithComments (Link, [Comment], Maybe (More [Comme
     interpretR _ =
     	join
     	. fmap (\t -> (,,) <$> (t ^. _1) <*> (t ^. _2) <*> (t ^. _3))
-    	. (\t -> (,,) <$> (fst t) <*> (fst . snd $ t) <*> (snd . snd $ t) )
-    	-- . (join *** join *** join)
+    	. (\t -> (,,) <$> (fst t) <*> (fst . snd $ t) <*> (snd . snd $ t)) -- this trickery is needed to emulate `sequence`
     	. (maybeToResult "Pre-parsing error" *** maybeToResult "Pre-parsing error" *** maybeToResult "Pre-parsing error")
     	. (fmap (parse parseJSON) *** fmap (parse parseJSON) *** fmap (Success))
     	. ((^. nth 0 . key "data" . key "children" . nth 0 . key "data")
@@ -118,12 +117,20 @@ instance RedditInteraction Login Modhash where
 		. fmap (parse parseJSON)
 		. (^. key "json" . key "data" . key "modhash")
 		. Just
-		. traceValueWith id
 
-data Me = Me
-instance RedditInteraction Me Value where
-	fetchR _ = value_from_request . HTTP.getRequest . const "http://www.reddit.com/api/me.json"
-	interpretR _ = Success
+data MeRequest = MeRequest
+instance RedditInteraction MeRequest Value where
+	fetchR _ = 
+		value_from_request
+		. HTTP.getRequest
+		. const "http://www.reddit.com/api/me.json"
+	interpretR _ =
+		join
+		. maybeToResult "Pre-parsing error"
+		. fmap (parse parseJSON)
+		. (^. key "data")
+		. Just
+
 
 data MakeComment = MakeComment {text :: String, target_id :: RedditName ()}
 instance RedditInteraction MakeComment Value where
@@ -191,3 +198,21 @@ instance FromJSON Votes where
 	    <*> o .: "downs"
 	    <*> o .: "likes")
     parseJSON _ = mzero
+
+instance FromJSON User where
+	parseJSON (Object o) = (User
+		<$> fmap RedditName (o .: "id")
+		<*> o .: "comment_karma"
+		-- created
+		-- created_utc
+		<*> o .:? "has_mail"
+		<*> o .:? "has_mod_mail"
+		<*> o .: "has_verified_email"
+		<*> o .: "is_friend"
+		<*> o .: "is_gold"
+		<*> o .: "is_mod"
+		<*> o .: "link_karma"
+		<*> o .:? "modhash"
+		<*> o .: "name"
+		<*> o .: "over_18")
+	parseJSON _ = mzero
