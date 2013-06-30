@@ -8,7 +8,7 @@ Distintion should be improved
 LinkWithComment's interpretR needs serious refactoring
 Non-informative interactions should have a better return type than plain Values
 
-Posting functionality is not added
+Posting functionality missing: only comments are added
 Various information functionality is also missing
 
 Strings should be avoided
