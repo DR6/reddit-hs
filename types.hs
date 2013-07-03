@@ -16,7 +16,7 @@ instance Show (RedditName Link) where
 instance Show (RedditName Comment) where
    show (RedditName i) = "t1_"++i
 
-instance Show (RedditName User) where
+instance Show (RedditName Account) where
 	show (RedditName i) = "t2_"++i
 
 instance Show (RedditName ()) where
@@ -68,7 +68,7 @@ data Link = Link {
 	media :: String, -- Object
 	media_embed :: String, --Object
 	num_comments :: Int,
-	over_18 :: Bool,
+	link_over_18 :: Bool,
 	permalink :: String,
 	saved :: Bool,
 	score :: Int,
@@ -76,8 +76,8 @@ data Link = Link {
 	thumbnail :: String,
 	url :: String} deriving Show
 
-data User = User {
-	user_name :: RedditName User,
+data Account = Account {
+	user_name :: RedditName Account,
 	user_comment_karma :: Int,
 	--created
 	--created_utc
@@ -90,7 +90,7 @@ data User = User {
 	user_link_karma :: Int,
 	user_modhash :: Maybe Modhash,
 	name :: String,
-	over_18 :: Bool}
-	
+	user_over_18 :: Bool}
+		deriving Show
 
 type Modhash = String

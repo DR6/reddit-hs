@@ -119,7 +119,7 @@ instance RedditInteraction Login Modhash where
 		. Just
 
 data MeRequest = MeRequest
-instance RedditInteraction MeRequest Value where
+instance RedditInteraction MeRequest Account where
 	fetchR _ = 
 		value_from_request
 		. HTTP.getRequest
@@ -199,8 +199,8 @@ instance FromJSON Votes where
 	    <*> o .: "likes")
     parseJSON _ = mzero
 
-instance FromJSON User where
-	parseJSON (Object o) = (User
+instance FromJSON Account where
+	parseJSON (Object o) = (Account
 		<$> fmap RedditName (o .: "id")
 		<*> o .: "comment_karma"
 		-- created
