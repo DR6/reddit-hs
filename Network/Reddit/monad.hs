@@ -1,8 +1,5 @@
-{-# LANGUAGE GADTs, RankNTypes, FlexibleInstances #-}
+{-# LANGUAGE GADTs, RankNTypes, FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies #-}
 module Network.Reddit.Monad where
-
-import Network.Reddit.Types
-import Network.Reddit.Instances
 
 import Control.Monad.Free
 import Data.Aeson.Types
@@ -13,21 +10,28 @@ import Control.Concurrent (threadDelay)
 import Control.Applicative
 import Data.Aeson (encode)
 import Data.ByteString.Lazy.Char8 (unpack)
-
+import qualified Network.HTTP as HTTP
 
 data RedditF next where
    Interaction :: (RedditInteraction i o) => i -> (Result o -> next) -> RedditF next
-   SetModhash :: Modhash -> next -> RedditF next
+   SetModhash :: String -> next -> RedditF next
+
+class RedditInteraction i o | i -> o where
+     fetchR :: String -> i -> StdBrowserAction (Result Value)
+     interpretR :: i -> Value -> Result o -- The g is only needed so that the typechecker can select the correct instance
+     actionR :: String -> i -> StdBrowserAction (Result o)
+     actionR m i = fmap (interpretR i =<<) . fetchR m $ i
 
 instance Functor RedditF where
 	fmap f (Interaction i c) = Interaction i (f . c)
 	fmap f (SetModhash m next) = SetModhash m (f next)
 
 type Reddit a = Free RedditF a
+type StdBrowserAction a = BrowserAction (HTTP.HandleStream String) a
 
 data FromRedditOptions = FromRedditOptions {
 	modifier :: forall a. StdBrowserAction a -> StdBrowserAction a, -- Changes to each interaction
-	modhash :: Modhash}
+	modhash :: String}
 defOptions = FromRedditOptions {
 	modifier = \b -> liftIO (threadDelay 1000000) >> b,
 	modhash = ""}

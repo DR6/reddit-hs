@@ -91,7 +91,7 @@ data Account = Account {
 	is_gold :: Bool,
 	is_mod :: Bool,
 	user_link_karma :: Int,
-	user_modhash :: Maybe Modhash,
+	user_modhash :: Maybe String,
 	user_name :: String,
 	user_over_18 :: Bool}
 		deriving Show
@@ -110,7 +110,3 @@ data Subreddit = Subreddit {
 	title :: String,
 	subreddit_url :: String}
 		deriving Show
-	
-	
-
-type Modhash = String

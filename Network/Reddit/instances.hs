@@ -3,6 +3,7 @@
 module Network.Reddit.Instances where
 
 import Network.Reddit.Types
+import Network.Reddit.Monad
 
 import Data.Aeson
 import Control.Lens((^.), _1, _2, _3)
@@ -21,11 +22,6 @@ import Data.Maybe(fromJust)
 -- Debugging functions and imports. Everything should work correctly without these
 import Debug.Trace
 import Data.Word
-import System.IO.Unsafe
-
--- Type synonyms
-type StdBrowserAction a = BrowserAction (HTTP.HandleStream String) a
-
 
 -- Testing functions
 traceValueWith f a = traceShow (f a) a
@@ -69,16 +65,6 @@ makeCommentRequest m c = HTTP.postRequest $ "http://www.reddit.com/api/comment?"
 	("thing_id", show . target_id $ c),
 	("uh",m)]
 
--- RedditInteraction class and a few
-class RedditInteraction i o | i -> o where
-     fetchR :: Modhash -> i -> StdBrowserAction (Result Value)
-     interpretR :: i -> Value -> Result o -- The g is only needed so that the typechecker can select the correct instance
-     actionR :: Modhash -> i -> StdBrowserAction (Result o)
-     actionR m i = fmap (interpretR i =<<) . fetchR m $ i
-
-data More c where
-    More :: (RedditInteraction g c) => g -> More c
-
 -- RedditInteraction instances together with their associated types
 newtype LinkOnly = LinkOnly {getLinkOnly :: RedditName Link}
 instance RedditInteraction LinkOnly Link where
@@ -92,7 +78,7 @@ instance RedditInteraction LinkOnly Link where
       . Just
       
 newtype LinkWithComments = LinkWithComments {getLinkWithComments :: RedditName Link}
-instance RedditInteraction LinkWithComments (Link, [Comment], Maybe (More [Comment])) where
+instance RedditInteraction LinkWithComments (Link, [Comment], Maybe (Reddit [Comment])) where
     fetchR _ = from_name_with_url (\i -> "http://www.reddit.com/comments/"++i++".json")
                   . getLinkWithComments
     interpretR _ =
@@ -107,7 +93,7 @@ instance RedditInteraction LinkWithComments (Link, [Comment], Maybe (More [Comme
     	. Just
  
 data Login = Login String String -- Username and password
-instance RedditInteraction Login Modhash where
+instance RedditInteraction Login String where
 	fetchR _ =
 		value_from_request
 		. makeLoginRequest
