@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleInstances, FlexibleContexts #-}
 
-module Types where
+module Network.Reddit.Types where
 import Data.Time
 import Network.Browser
 

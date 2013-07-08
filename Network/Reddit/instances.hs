@@ -1,8 +1,8 @@
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, OverloadedStrings, GADTs, FlexibleInstances #-}
 
-module Instances where
+module Network.Reddit.Instances where
 
-import Types
+import Network.Reddit.Types
 
 import Data.Aeson
 import Control.Lens((^.), _1, _2, _3)

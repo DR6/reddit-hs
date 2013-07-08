@@ -1,8 +1,8 @@
-{-# LANGUAGE GADTs, MultiParamTypeClasses, FunctionalDependencies, DeriveFunctor, RankNTypes #-}
-module Monad where
+{-# LANGUAGE GADTs, RankNTypes, FlexibleInstances #-}
+module Network.Reddit.Monad where
 
-import Types
-import Instances
+import Network.Reddit.Types
+import Network.Reddit.Instances
 
 import Control.Monad.Free
 import Data.Aeson.Types
@@ -11,6 +11,9 @@ import Control.Monad.State
 import Control.Monad.Morph
 import Control.Concurrent (threadDelay)
 import Control.Applicative
+import Data.Aeson (encode)
+import Data.ByteString.Lazy.Char8 (unpack)
+
 
 data RedditF next where
    Interaction :: (RedditInteraction i o) => i -> (Result o -> next) -> RedditF next
@@ -21,6 +24,8 @@ instance Functor RedditF where
 	fmap f (SetModhash m next) = SetModhash m (f next)
 
 type Reddit a = Free RedditF a
+
+	
 interaction i = liftF $ Interaction i id
 setModhash m = liftF $ SetModhash m ()
 login u p = do
@@ -36,32 +41,17 @@ defOptions = FromRedditOptions {
 	modifier = \b -> liftIO (threadDelay 1000000) >> b,
 	modhash = ""}
 
---rawToBrowserAction :: FromRedditOptions -> Reddit a -> StdBrowserAction a
+defInitializer :: StdBrowserAction ()
+defInitializer = do
+	setAllowRedirects True
+	setUserAgent "haskell reddit API wrapper, still in early development"
+
+customToBrowserAction :: FromRedditOptions -> Reddit a -> StdBrowserAction a
 customToBrowserAction ops = flip evalStateT (modhash ops) . retract . hoistFree (hoist (modifier ops) . runner)
 	where
 		runner (Interaction input f) = get >>= \modhash -> (lift . fmap f . actionR modhash $ input)
 		runner (SetModhash m e) = put m >> return e
 
-{--}
 toBrowserAction = customToBrowserAction defOptions
-customPerformReddit initializer ops = browse . (initializer>>) . rawToBrowserAction ops
-
--- Test zone
-{--}
-testAction :: Reddit Bool
-testAction = do
-	loginerr <- login "DR6" "drgdrg493"
-	case loginerr of
-		Nothing -> do
-			comment <- interaction $ MakeComment "Hello from Haskell!\n*Markdown should work*" (RedditName "t3_1h1qsg")
-			return $ traceValueWith id comment
-			return True
-		Just e -> 
-			return False
-
-initializer :: StdBrowserAction ()
-initializer = do
-	setAllowRedirects True
-	setUserAgent "haskell reddit API writer, still in early development"
-
-main = print =<< customPerformReddit initializer defOptions testAction
+customPerformReddit initializer ops = browse . (initializer>>) . customToBrowserAction ops
+performReddit = customPerformReddit defInitializer defOptions
