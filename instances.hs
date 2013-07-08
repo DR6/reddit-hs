@@ -134,9 +134,22 @@ instance RedditInteraction MeRequest Account where
 
 data MakeComment = MakeComment {text :: String, target_id :: RedditName ()}
 instance RedditInteraction MakeComment Value where
-	fetchR m = value_from_request . makeCommentRequest m . traceShow m
+	fetchR m = value_from_request . makeCommentRequest m
 	interpretR _ = Success
 
+newtype SubredditInfo = SubredditInfo {getSubredditInfo :: String}
+instance RedditInteraction SubredditInfo Subreddit where
+	fetchR _ =
+		value_from_request
+		. HTTP.getRequest
+		. (\u -> "http://www.reddit.com"++u++"about.json")
+		. getSubredditInfo
+	interpretR _ =
+		join
+		. maybeToResult "Pre-parsing error"
+		. fmap (parse parseJSON)
+		. (^. key "data")
+		. Just
 
 -- Parsing instances
 instance FromJSON Link where
@@ -151,8 +164,8 @@ instance FromJSON Link where
 	    <*> (constructEither
 	              <$> o .:? "link_flair_css_class"
 	              <*> o .:? "link_flair_text")
-	    <*> (pure "to implement") -- media, TI
-	    <*> (pure "to implement") -- media_embed, TI
+	    -- <*> (pure "to implement") -- media, TI
+	    -- <*> (pure "to implement") -- media_embed, TI
 	    <*> o .: "num_comments"
 	    <*> o .: "over_18"
 	    <*> o .: "permalink"
@@ -216,3 +229,18 @@ instance FromJSON Account where
 		<*> o .: "name"
 		<*> o .: "over_18")
 	parseJSON _ = mzero
+	
+instance FromJSON Subreddit where
+	parseJSON (Object o) = (Subreddit
+		<$> fmap RedditName (o .: "id")
+		<*> o .: "accounts_active"
+		<*> o .: "description"
+		<*> o .: "description_html"
+		<*> o .: "display_name"
+		<*> o .:? "header_img"
+		<*> o .:? "header_size"
+		<*> o .: "over18"
+		<*> o .: "description"
+		<*> o .: "subscribers"
+		<*> o .: "title"
+		<*> o .: "url")

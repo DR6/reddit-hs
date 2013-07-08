@@ -19,6 +19,9 @@ instance Show (RedditName Comment) where
 instance Show (RedditName Account) where
 	show (RedditName i) = "t2_"++i
 
+instance Show (RedditName Subreddit) where
+	show (RedditName i) = "t5_"++i
+
 instance Show (RedditName ()) where
 	show = getName
 
@@ -44,7 +47,7 @@ type Distintion = String -- to be improved
 
 data Comment = Comment {
 	approved_by :: Maybe String,
-	comment_name :: RedditName Comment,
+	comment_rname :: RedditName Comment,
     comment_info :: ContentInfo,
     comment_votes :: Votes,
     --comment_created :: CreatedInfo,
@@ -56,7 +59,7 @@ data Comment = Comment {
     parent_id :: RedditID} deriving Show
 
 data Link = Link {
-	link_name :: RedditName Link,
+	link_rname :: RedditName Link,
 	link_info :: ContentInfo,
 	link_votes :: Votes,
 	--link_created :: CreatedInfo,
@@ -65,8 +68,8 @@ data Link = Link {
 	hidden :: Bool,
 	is_self :: Bool,
 	link_flair :: Maybe (Either String String),
-	media :: String, -- Object
-	media_embed :: String, --Object
+	-- media :: String, -- Object
+	-- media_embed :: String, --Object
 	num_comments :: Int,
 	link_over_18 :: Bool,
 	permalink :: String,
@@ -77,7 +80,7 @@ data Link = Link {
 	url :: String} deriving Show
 
 data Account = Account {
-	user_name :: RedditName Account,
+	user_rname :: RedditName Account,
 	user_comment_karma :: Int,
 	--created
 	--created_utc
@@ -89,8 +92,25 @@ data Account = Account {
 	is_mod :: Bool,
 	user_link_karma :: Int,
 	user_modhash :: Maybe Modhash,
-	name :: String,
+	user_name :: String,
 	user_over_18 :: Bool}
 		deriving Show
+
+data Subreddit = Subreddit {
+	subreddit_rname :: RedditName Subreddit,
+	accounts_active :: Int,
+	description :: String,
+	description_html :: String,
+	display_name :: String,
+	header_img :: Maybe String,
+	header_size :: Maybe (Int, Int),
+	subreddit_over_18 :: Bool,
+	public_description :: String,
+	subscribers :: Int,
+	title :: String,
+	subreddit_url :: String}
+		deriving Show
+	
+	
 
 type Modhash = String
