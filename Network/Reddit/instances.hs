@@ -179,7 +179,6 @@ instance RedditInteraction GetLinkListing [Link] where
 		. sequence
 		. (^.. key "data" . key "children" . traverseArray . key "data")
 		. Just--}
-	_test = (sample_listing, constructURLfromGetListing)
 
 
 -- Parsing instances
