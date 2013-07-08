@@ -1,13 +1,14 @@
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, OverloadedStrings, GADTs, FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, OverloadedStrings, GADTs, FlexibleInstances, TupleSections #-}
 
 module Network.Reddit.Instances where
 
 import Network.Reddit.Types
 import Network.Reddit.Monad
+import Network.Reddit.Test(sample_listing)
 
 import Data.Aeson
-import Control.Lens((^.), _1, _2, _3)
-import Data.Aeson.Lens(nth,key)
+import Control.Lens((^.), _1, _2, _3, (^..), toListOf)
+import Data.Aeson.Lens(nth,key,traverseArray)
 import Data.Aeson.Types
 import qualified Data.ByteString.Lazy as L
 import qualified Network.HTTP as HTTP
@@ -17,7 +18,7 @@ import Network.Browser
 import Control.Applicative
 import Control.Monad
 import Control.Arrow
-import Data.Maybe(fromJust)
+import Data.Maybe(fromJust, catMaybes)
 
 -- Debugging functions and imports. Everything should work correctly without these
 import Debug.Trace
@@ -136,6 +137,50 @@ instance RedditInteraction SubredditInfo Subreddit where
 		. fmap (parse parseJSON)
 		. (^. key "data")
 		. Just
+
+data TimeSpan = Hour | Day | Week | Month | Year | All
+data Sorting = Hot | New | Top TimeSpan | Controversial TimeSpan
+instance Show Sorting where
+	show Hot = "/hot"
+	show New = "/new"
+	show (Top _) = "/top"
+	show (Controversial _) = "/controversial"
+data GetLinkListing = GetLinkListing {
+	fromsubreddit :: Maybe String,
+	range :: Maybe (RedditRange Link),
+	sorting :: Sorting,
+	-- count
+	limit :: Maybe Int}
+	-- show
+	-- target
+
+defGetListing sub sort = GetLinkListing sub Nothing sort Nothing
+constructURLfromGetListing :: GetLinkListing -> String
+constructURLfromGetListing getlisting=
+	let
+		base = "http://www.reddit.com"
+		usubreddit = maybe "" id .fromsubreddit $ getlisting
+		current_sorting = (++".json") . show . sorting $ getlisting
+		options = HTTP.urlEncodeVars . catMaybes $ [
+			fmap (("limit",) . show) (limit getlisting)
+			]
+	in
+		base ++ usubreddit ++ current_sorting ++ options
+instance RedditInteraction GetLinkListing [Link] where
+	fetchR _ =
+		value_from_request
+		. HTTP.getRequest
+		. constructURLfromGetListing
+	interpretR _ =
+		join
+		. fmap sequence
+		. (fmap . fmap) (parse parseJSON)
+		. maybeToResult "Pre-parsing error"
+		. sequence
+		. (^.. key "data" . key "children" . traverseArray . key "data")
+		. Just--}
+	_test = (sample_listing, constructURLfromGetListing)
+
 
 -- Parsing instances
 instance FromJSON Link where

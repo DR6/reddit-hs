@@ -21,6 +21,7 @@ class RedditInteraction i o | i -> o where
      interpretR :: i -> Value -> Result o -- The g is only needed so that the typechecker can select the correct instance
      actionR :: String -> i -> StdBrowserAction (Result o)
      actionR m i = fmap (interpretR i =<<) . fetchR m $ i
+     _test :: (o, i -> String) -- the string is a description of what was done
 
 instance Functor RedditF where
 	fmap f (Interaction i c) = Interaction i (f . c)

@@ -3,6 +3,7 @@
 module Network.Reddit.Types where
 import Data.Time
 import Network.Browser
+import Data.String
 
 -- Types
 data RedditName a = RedditName {getName :: RedditID}
@@ -12,7 +13,8 @@ type RedditID = String
 
 instance Show (RedditName Link) where
    show (RedditName i) = "t3_"++i
-   
+instance IsString (RedditName Link) where
+	fromString = RedditName . drop 3
 instance Show (RedditName Comment) where
    show (RedditName i) = "t1_"++i
 
@@ -110,3 +112,5 @@ data Subreddit = Subreddit {
 	title :: String,
 	subreddit_url :: String}
 		deriving Show
+
+type RedditRange a = (RedditName a, RedditName a)

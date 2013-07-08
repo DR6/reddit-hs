@@ -3,12 +3,16 @@ TODO:
 ContentInfo: edited
 Link: clicked, hidden, media, media_embed, link_created
 Comment: comment_created
+Similar fields in other datatypes are missing too
 Distintion should be improved
 "More" objects are not extracted
-LinkWithComment's interpretR needs serious refactoring
+Options are missing in LinkWithComment
+Options are missing in GetLinkListing
 Non-informative interactions should have a better return type than plain Values
 
-Posting functionality missing: only comments are added
-Various information functionality is also missing
+Posting functionality missing: only comments can be added
+Implement rest of the API
 
 Strings should be avoided
+LinkWithComment's interpretR needs to be written more clearly
+Request building is done chaotically: refactoring is needed
