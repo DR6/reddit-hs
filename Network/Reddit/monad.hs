@@ -25,15 +25,6 @@ instance Functor RedditF where
 
 type Reddit a = Free RedditF a
 
-	
-interaction i = liftF $ Interaction i id
-setModhash m = liftF $ SetModhash m ()
-login u p = do
-	m <- interaction $ Login u p
-	case m of
-		(Success modhash) -> setModhash modhash >> return Nothing
-		(Error s) -> return . Just $ s
-
 data FromRedditOptions = FromRedditOptions {
 	modifier :: forall a. StdBrowserAction a -> StdBrowserAction a, -- Changes to each interaction
 	modhash :: Modhash}
