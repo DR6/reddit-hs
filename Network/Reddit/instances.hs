@@ -4,7 +4,7 @@ module Network.Reddit.Instances where
 
 import Network.Reddit.Types
 import Network.Reddit.Monad
-import Network.Reddit.Test(sample_listing)
+import Network.Reddit.Test hiding (convert)
 
 import Data.Aeson
 import Control.Lens((^.), _1, _2, _3, (^..))
@@ -19,17 +19,6 @@ import Control.Applicative
 import Control.Monad
 import Control.Arrow
 import Data.Maybe(fromJust, catMaybes)
-
--- Debugging functions and imports. Everything should work correctly without these
-import Debug.Trace
-import Data.Word
-
--- Testing functions
-traceValueWith f a = traceShow (f a) a
-jsonStr = putStr . map (convert :: Word8 -> Char). L.unpack . encode . (\(Success a) -> a) :: Result Value -> IO ()
-
--- a <- getObject . LinkWithComments . RedditName $ "1dx0q5"
--- b <- getObject . LinkOnly . RedditName $ "1dx0q5"
 
 -- Unspecific tility functions
 convert :: (Enum a, Enum b) => a -> b
