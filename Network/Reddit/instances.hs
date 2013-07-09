@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, OverloadedStrings, GADTs, FlexibleInstances, TupleSections #-}
+{-# LANGUAGE MultiParamTypeClasses, OverloadedStrings, FlexibleInstances, TupleSections, TemplateHaskell #-}
 
 module Network.Reddit.Instances where
 
@@ -7,7 +7,7 @@ import Network.Reddit.Monad
 import Network.Reddit.Test(sample_listing)
 
 import Data.Aeson
-import Control.Lens((^.), _1, _2, _3, (^..), toListOf)
+import Control.Lens((^.), _1, _2, _3, (^..))
 import Data.Aeson.Lens(nth,key,traverseArray)
 import Data.Aeson.Types
 import qualified Data.ByteString.Lazy as L
@@ -40,6 +40,7 @@ constructEither _ (Just right) = Just . Right $ right
 constructEither _ _ = Nothing
 maybeToResult s = maybe (Error s) (Success)
 
+-- URI handling
 -- Specific utility functions
 value_from_request :: HTTP.Request_String -> StdBrowserAction (Result Value)
 value_from_request = 
