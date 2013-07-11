@@ -9,10 +9,10 @@ Distintion should be improved
 Options are missing in LinkWithComment
 Options are missing in GetLinkListing
 Non-informative interactions should have a better return type than plain Values
+GetSubreddit's input should be checked and compared with Subreddit's output and GetListing: it's not sure that they match
 
 Posting functionality missing: only comments can be added
 Implement rest of the API
 
 Strings should be avoided
 LinkWithComment's interpretR needs to be written more clearly
-Request building is done chaotically: refactoring is needed

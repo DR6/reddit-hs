@@ -7,18 +7,19 @@ import Network.Reddit.Monad
 import Network.Reddit.Test hiding (convert)
 
 import Data.Aeson
-import Control.Lens((^.), _1, _2, _3, (^..))
+import Control.Lens((^.), _1, _2, _3, (^..), (.~), (%~))
 import Data.Aeson.Lens(nth,key,traverseArray)
 import Data.Aeson.Types
 import qualified Data.ByteString.Lazy as L
 import qualified Network.HTTP as HTTP
-import qualified Network.URI as URI
+import Network.URI hiding (path, query)
 import Network.Browser
 
 import Control.Applicative
 import Control.Monad
 import Control.Arrow
 import Data.Maybe(fromJust, catMaybes)
+import Control.Lens.TH
 
 -- Unspecific tility functions
 convert :: (Enum a, Enum b) => a -> b
@@ -29,7 +30,29 @@ constructEither _ (Just right) = Just . Right $ right
 constructEither _ _ = Nothing
 maybeToResult s = maybe (Error s) (Success)
 
+
 -- URI handling
+$(makeLensesFor [("uriScheme","_uriScheme"),
+	("uriAuthority","_uriAuthority"),
+	("uriPath","_uriPath"),
+	("uriQuery","_uriQuery"),
+	("uriFragment","_uriFragment")
+	] ''URI)
+
+redditURI :: Bool -> URI -> URI -- the bool decides wether it's np or not
+redditURI np = (_uriScheme .~ "http:") . (_uriAuthority .~ auth)
+    where server = if np then "np.reddit.com" else "www.reddit.com"
+          auth = Just $ URIAuth "" server ""
+
+path :: String -> URI -> URI
+path str = (_uriPath .~ ("/"++str) )
+
+asjson :: URI -> URI
+asjson =  _uriPath %~ (++".json")
+
+query :: [(String, String)] -> URI -> URI
+query attrs = (_uriQuery .~ HTTP.urlEncodeVars attrs)
+{--}
 -- Specific utility functions
 value_from_request :: HTTP.Request_String -> StdBrowserAction (Result Value)
 value_from_request = 
@@ -40,38 +63,31 @@ value_from_request =
 		. HTTP.rspBody
 		. snd)
 	. request
-request_from_name :: (String -> String) -> RedditName a -> HTTP.Request_String
-request_from_name f =
-	HTTP.getRequest
-	. f
-	. getName
 
-from_name_with_url :: (String -> String) -> RedditName a -> StdBrowserAction (Result Value)
-from_name_with_url f = value_from_request . request_from_name f
+get :: URI -> HTTP.Request_String
+get = HTTP.getRequest . show
+post :: URI -> HTTP.Request_String
+post = HTTP.postRequest . show
 
-makeLoginRequest (Login username password) = HTTP.postRequest $"http://www.reddit.com/api/login/"++username++"?user="++username++"&passwd="++password++"&api_type=json"
-makeCommentRequest m c = HTTP.postRequest $ "http://www.reddit.com/api/comment?"++HTTP.urlEncodeVars [
-	("api_type","json"),
-	("text", text c),
-	("thing_id", show . target_id $ c),
-	("uh",m)]
 
 -- RedditInteraction instances together with their associated types
 newtype LinkOnly = LinkOnly {getLinkOnly :: RedditName Link}
 instance RedditInteraction LinkOnly Link where
-     fetchR _ = from_name_with_url (\i -> "http://www.reddit.com/by_id/t3_"++i++".json")
-                 . getLinkOnly
+     fetchR _ link = value_from_request . get . redditURI False . asjson . path getlink $ nullURI
+          where getlink = "by_id/"++ linkid
+                linkid = show . getLinkOnly $ link
      interpretR _ =
       join
       . maybeToResult "Pre-parsing error"
       . fmap (parse parseJSON)
       . (^. key "data" . key "children" . nth 0 . key "data")
       . Just
-      
+     
 newtype LinkWithComments = LinkWithComments {getLinkWithComments :: RedditName Link}
 instance RedditInteraction LinkWithComments (Link, [Comment], Maybe (Reddit [Comment])) where
-    fetchR _ = from_name_with_url (\i -> "http://www.reddit.com/comments/"++i++".json")
-                  . getLinkWithComments
+    fetchR _ link = value_from_request . get . redditURI False . asjson . path getlink $ nullURI
+         where getlink = "comments/" ++ linkid
+               linkid = show . getLinkWithComments $ link
     interpretR _ =
     	join
     	. fmap (\t -> (,,) <$> (t ^. _1) <*> (t ^. _2) <*> (t ^. _3))
@@ -82,25 +98,21 @@ instance RedditInteraction LinkWithComments (Link, [Comment], Maybe (Reddit [Com
     		&&& (^. nth 1 . key "data" . key "children")
     		&&& (const (Just Nothing))) -- TI
     	. Just
- 
+
 data Login = Login String String -- Username and password
 instance RedditInteraction Login String where
-	fetchR _ =
-		value_from_request
-		. makeLoginRequest
+	fetchR _ (Login un pw) = value_from_request . post . redditURI False . path ("api/login/"++un) . query vars $ nullURI
+	     where vars = [("user",un),("password",pw),("api_type","json")]
 	interpretR _ =
 		join
 		. maybeToResult "Pre-parsing error"
 		. fmap (parse parseJSON)
 		. (^. key "json" . key "data" . key "modhash")
 		. Just
-
+{--}
 data MeRequest = MeRequest
 instance RedditInteraction MeRequest Account where
-	fetchR _ = 
-		value_from_request
-		. HTTP.getRequest
-		. const "http://www.reddit.com/api/me.json"
+	fetchR _ = value_from_request . HTTP.getRequest . const "http://www.reddit.com/api/me.json"
 	interpretR _ =
 		join
 		. maybeToResult "Pre-parsing error"
@@ -111,16 +123,14 @@ instance RedditInteraction MeRequest Account where
 
 data MakeComment = MakeComment {text :: String, target_id :: RedditName ()}
 instance RedditInteraction MakeComment Value where
-	fetchR m = value_from_request . makeCommentRequest m
+	fetchR m comment = value_from_request . post . redditURI False . path "api/comment" . query vars $ nullURI
+	    where vars = [("api_type","json"), ("text",text comment), ("thing_id",show . target_id $ comment), ("uh",m)]
 	interpretR _ = Success
-
+{--}
 newtype SubredditInfo = SubredditInfo {getSubredditInfo :: String}
 instance RedditInteraction SubredditInfo Subreddit where
-	fetchR _ =
-		value_from_request
-		. HTTP.getRequest
-		. (\u -> "http://www.reddit.com"++u++"about.json")
-		. getSubredditInfo
+	fetchR _ sub= value_from_request . get . redditURI False . asjson . path aboutpath $ nullURI
+	    where aboutpath = getSubredditInfo sub ++ "about.json"
 	interpretR _ =
 		join
 		. maybeToResult "Pre-parsing error"
@@ -145,22 +155,13 @@ data GetLinkListing = GetLinkListing {
 	-- target
 
 defGetListing sub sort = GetLinkListing sub Nothing sort Nothing
-constructURLfromGetListing :: GetLinkListing -> String
-constructURLfromGetListing getlisting=
-	let
-		base = "http://www.reddit.com"
-		usubreddit = maybe "" id .fromsubreddit $ getlisting
-		current_sorting = (++".json") . show . sorting $ getlisting
-		options = HTTP.urlEncodeVars . catMaybes $ [
+instance RedditInteraction GetLinkListing [Link] where
+	fetchR _ getlisting = value_from_request . get . path (usubreddit ++ current_sorting) . query vars $ nullURI
+	    where usubreddit = maybe "" id . fromsubreddit $ getlisting
+	          current_sorting = show . sorting $ getlisting
+	          vars = catMaybes $ [
 			fmap (("limit",) . show) (limit getlisting)
 			]
-	in
-		base ++ usubreddit ++ current_sorting ++ options
-instance RedditInteraction GetLinkListing [Link] where
-	fetchR _ =
-		value_from_request
-		. HTTP.getRequest
-		. constructURLfromGetListing
 	interpretR _ =
 		join
 		. fmap sequence
@@ -168,7 +169,7 @@ instance RedditInteraction GetLinkListing [Link] where
 		. maybeToResult "Pre-parsing error"
 		. sequence
 		. (^.. key "data" . key "children" . traverseArray . key "data")
-		. Just--}
+		. Just
 
 
 -- Parsing instances
