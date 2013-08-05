@@ -17,4 +17,4 @@ cabal-version:       >=1.8
 library
   exposed-modules:     Network.Reddit
   other-modules:       Network.Reddit.Monad, Network.Reddit.Types, Network.Reddit.Instances
-  build-depends:       base == 4.5.*, free == 3.4.*, aeson ==0.6.*, aeson-lens ==0.5.*, mmorph >=0.1, lens >=3.9.0.0
+  build-depends:       base >= 4.5, free >= 3.4, aeson >= 0.6, aeson-lens >= 0.5, mmorph >=0.1, lens >=3.9, HTTP >= 400.2, bytestring >= 0.10.0.2, mtl >= 2.1.2, time >= 1.4.0.1, network >= 2.4.1.2
