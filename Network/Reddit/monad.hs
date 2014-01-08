@@ -1,8 +1,8 @@
-{-# LANGUAGE GADTs, RankNTypes, MultiParamTypeClasses, FunctionalDependencies, EmptyDataDecls #-}
+{-# LANGUAGE GADTs, RankNTypes, MultiParamTypeClasses, FunctionalDependencies, EmptyDataDecls, FlexibleInstances #-}
 module Network.Reddit.Monad where
 
 import Control.Monad.Free
-import Control.Monad.IO.Class(liftIO)
+import Control.Monad.IO.Class
 import Data.Aeson.Types
 import Control.Concurrent (threadDelay)
 import qualified Network.HTTP as HTTP
@@ -14,6 +14,7 @@ data RedditF requires next where
 	Fetch :: (RedditFetch i o)  => i -> (o -> next) -> RedditF a next
 	Act :: (RedditAct i o) => i -> (o -> next) -> RedditF RequiresLogin next
 	WithLogin  :: String -> RedditF RequiresLogin next -> RedditF () next
+	LiftIO :: IO a -> RedditF r a
 	
    
 
@@ -28,8 +29,11 @@ instance Functor (RedditF a) where
 	fmap f (Act i handler) = Act i (f . handler)
 	fmap f (WithLogin m poster) = WithLogin m (fmap f poster)
 
-type Reddit r a = Free (RedditF ()) a
+type Reddit r a = Free (RedditF r) a
 type StdBrowserAction a = BrowserAction (HTTP.HandleStream String) a
+
+instance MonadIO (Free (RedditF a)) where
+	liftIO = liftF . LiftIO 
 
 data FromRedditOptions = FromRedditOptions {
 	modifier :: forall a. StdBrowserAction a -> StdBrowserAction a -- Changes to each interaction
