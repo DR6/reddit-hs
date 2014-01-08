@@ -3,18 +3,19 @@
 
 name:                reddit-hs
 version:             0.1.0.0
-synopsis:            This is a Haskell wrapper of reddit's API: the external interfface is handled via a Reddit monad.
+synopsis:            A Haskell wrapper for the reddit API.
 -- description:         
+homepage:            https://github.com/DR6/reddit-hs
 license:             LGPL-3
 license-file:        LICENSE
-author:              Daniel Roca González(DR6)
+author:              Daniel Roca González
 maintainer:          darkairblast@gmail.com
 -- copyright:           
-category:            Web
+category:            Network
 build-type:          Simple
 cabal-version:       >=1.8
 
 library
   exposed-modules:     Network.Reddit
-  other-modules:       Network.Reddit.Monad, Network.Reddit.Types, Network.Reddit.Instances
-  build-depends:       base >= 4.5, free >= 3.4, aeson >= 0.6, aeson-lens >= 0.5, mmorph >=0.1, lens >=3.9, HTTP >= 400.2, bytestring >= 0.10.0.2, mtl >= 2.1.2, time >= 1.4.0.1, network >= 2.4.1.2
+  -- other-modules:       
+  build-depends:       base ==4.6.*, HTTP >=2.8, free >=4.2, lens-aeson>=0.1.2, aeson>=0.6.2.1, lens >=3.10.1, network >=2.4.1.2, bytestring >=0.10.0.2, time >=1.4.0.1, transformers >=0.3

@@ -4,11 +4,10 @@ module Network.Reddit.Instances where
 
 import Network.Reddit.Types
 import Network.Reddit.Monad
-import Network.Reddit.Test hiding (convert)
 
 import Data.Aeson
-import Control.Lens((^.), _1, _2, _3, (^..), (.~), (%~))
-import Data.Aeson.Lens(nth,key,traverseArray)
+import Control.Lens
+import Control.Lens.Aeson
 import Data.Aeson.Types
 import qualified Data.ByteString.Lazy as L
 import qualified Network.HTTP as HTTP
@@ -21,7 +20,7 @@ import Control.Arrow
 import Data.Maybe(fromJust, catMaybes)
 import Control.Lens.TH
 
--- Unspecific tility functions
+-- Unspecific utility functions
 convert :: (Enum a, Enum b) => a -> b
 convert = toEnum . fromEnum
 constructEither :: Maybe a -> Maybe b -> Maybe (Either a b)
@@ -52,7 +51,7 @@ asjson =  _uriPath %~ (++".json")
 
 query :: [(String, String)] -> URI -> URI
 query attrs = (_uriQuery .~ HTTP.urlEncodeVars attrs)
-{--}
+
 -- Specific utility functions
 value_from_request :: HTTP.Request_String -> StdBrowserAction (Result Value)
 value_from_request = 
@@ -72,71 +71,72 @@ post = HTTP.postRequest . show
 
 -- RedditInteraction instances together with their associated types
 newtype LinkOnly = LinkOnly {getLinkOnly :: RedditName Link}
-instance RedditInteraction LinkOnly Link where
-     fetchR _ link = value_from_request . get . redditURI False . asjson . path getlink $ nullURI
-          where getlink = "by_id/"++ linkid
-                linkid = show . getLinkOnly $ link
-     interpretR _ =
-      join
-      . maybeToResult "Pre-parsing error"
-      . fmap (parse parseJSON)
-      . (^. key "data" . key "children" . nth 0 . key "data")
-      . Just
-     
+instance RedditFetch LinkOnly Link where
+     fetch link = fmap (>>= interpret) . value_from_request . get . redditURI False . asjson . path getlink $ nullURI
+          where
+		getlink = "by_id/"++ linkid
+		linkid = show . getLinkOnly $ link
+		interpret json = do
+			linkJson <- maybeToResult "Error extracting link" $
+				json ^? key "data" . key "children" . nth 0 . key "data"
+			parse parseJSON linkJson
+
 newtype LinkWithComments = LinkWithComments {getLinkWithComments :: RedditName Link}
-instance RedditInteraction LinkWithComments (Link, [Comment], Maybe (Reddit [Comment])) where
-    fetchR _ link = value_from_request . get . redditURI False . asjson . path getlink $ nullURI
-         where getlink = "comments/" ++ linkid
-               linkid = show . getLinkWithComments $ link
-    interpretR _ =
-    	join
-    	. fmap (\t -> (,,) <$> (t ^. _1) <*> (t ^. _2) <*> (t ^. _3))
-    	. (\t -> (,,) <$> (fst t) <*> (fst . snd $ t) <*> (snd . snd $ t)) -- this trickery is needed to emulate `sequence`
-    	. (maybeToResult "Pre-parsing error" *** maybeToResult "Pre-parsing error" *** maybeToResult "Pre-parsing error")
-    	. (fmap (parse parseJSON) *** fmap (parse parseJSON) *** fmap (Success))
-    	. ((^. nth 0 . key "data" . key "children" . nth 0 . key "data")
-    		&&& (^. nth 1 . key "data" . key "children")
-    		&&& (const (Just Nothing))) -- TI
-    	. Just
+instance RedditFetch LinkWithComments (Link, [Comment], Maybe (Reddit () [Comment])) where
+    fetch link = fmap (>>= interpret) . value_from_request . get . redditURI False . asjson . path getlink $ nullURI
+         where
+		getlink = "comments/" ++ linkid
+		linkid = show . getLinkWithComments $ link
+		interpret json = do
+			linkJson <- maybeToResult "Error extracting link" $
+				json ^? nth 0 . key "data" . key "children" . nth 0 . key "data"
+			commentsJson <- maybeToResult "Error extracting comments" $ 
+				json ^? nth 1 . key "data" . key "children"
+			unloadedCommentsJson <- Success Nothing -- TI
+			link <- parse parseJSON linkJson
+			comments <- parse parseJSON commentsJson
+			unloadedComments <- Success Nothing -- TI
+			return (link, comments, unloadedComments)
+
 
 data Login = Login String String -- Username and password
-instance RedditInteraction Login String where
-	fetchR _ (Login un pw) = value_from_request . post . redditURI False . path ("api/login/"++un) . query vars $ nullURI
-	     where vars = [("user",un),("password",pw),("api_type","json")]
-	interpretR _ =
-		join
-		. maybeToResult "Pre-parsing error"
-		. fmap (parse parseJSON)
-		. (^. key "json" . key "data" . key "modhash")
-		. Just
-{--}
+instance RedditFetch Login String where
+	fetch (Login un pw) = fmap (>>= interpret) . value_from_request . post . redditURI False . path ("api/login/"++un) . query vars $ nullURI
+	     where
+			vars = [("user",un),("password",pw),("api_type","json")]
+			interpret json = do
+				loginJson <- maybeToResult "Error extracting modhash" $
+					json ^? key "json" . key "data" . key "modhash"
+				parse parseJSON loginJson
+
+
 data MeRequest = MeRequest
-instance RedditInteraction MeRequest Account where
-	fetchR _ = value_from_request . HTTP.getRequest . const "http://www.reddit.com/api/me.json"
-	interpretR _ =
-		join
-		. maybeToResult "Pre-parsing error"
-		. fmap (parse parseJSON)
-		. (^. key "data")
-		. Just
+instance RedditAct MeRequest Account where
+	act _ _ = fmap (>>= interpret) . value_from_request . HTTP.getRequest $ "http://www.reddit.com/api/me.json"
+		where
+			interpret json = do
+				meJson <- maybeToResult "Error extracting user information" $
+					json ^? key "data"
+				parse parseJSON meJson
 
 
 data MakeComment = MakeComment {text :: String, target_id :: RedditName ()}
-instance RedditInteraction MakeComment Value where
-	fetchR m comment = value_from_request . post . redditURI False . path "api/comment" . query vars $ nullURI
-	    where vars = [("api_type","json"), ("text",text comment), ("thing_id",show . target_id $ comment), ("uh",m)]
-	interpretR _ = Success
-{--}
+instance RedditAct MakeComment Value where
+	act m comment = fmap (>>= interpret) . value_from_request . post . redditURI False . path "api/comment" . query vars $ nullURI
+	    where
+		vars = [("api_type","json"), ("text",text comment), ("thing_id",show . target_id $ comment), ("uh",m)]
+		interpret = Success
+
+
 newtype SubredditInfo = SubredditInfo {getSubredditInfo :: String}
-instance RedditInteraction SubredditInfo Subreddit where
-	fetchR _ sub= value_from_request . get . redditURI False . asjson . path aboutpath $ nullURI
-	    where aboutpath = getSubredditInfo sub ++ "about.json"
-	interpretR _ =
-		join
-		. maybeToResult "Pre-parsing error"
-		. fmap (parse parseJSON)
-		. (^. key "data")
-		. Just
+instance RedditFetch SubredditInfo Subreddit where
+	fetch sub = fmap (>>= interpret) . value_from_request . get . redditURI False . asjson . path aboutpath $ nullURI
+	    where
+		aboutpath = getSubredditInfo sub ++ "about.json"
+		interpret json = do
+			subJson <- maybeToResult "Error extracting subreddit" $
+				json ^? key "data"
+			parse parseJSON subJson
 
 data TimeSpan = Hour | Day | Week | Month | Year | All
 data Sorting = Hot | New | Top TimeSpan | Controversial TimeSpan
@@ -155,22 +155,19 @@ data GetLinkListing = GetLinkListing {
 	-- target
 
 defGetListing sub sort = GetLinkListing sub Nothing sort Nothing
-instance RedditInteraction GetLinkListing [Link] where
-	fetchR _ getlisting = value_from_request . get . path (usubreddit ++ current_sorting) . query vars $ nullURI
-	    where usubreddit = maybe "" id . fromsubreddit $ getlisting
-	          current_sorting = show . sorting $ getlisting
-	          vars = catMaybes $ [
+instance RedditFetch GetLinkListing [Link] where
+	fetch getlisting = fmap (>>= interpret) . value_from_request . get . path (usubreddit ++ current_sorting) . query vars $ nullURI
+	    where
+		usubreddit = maybe "" id . fromsubreddit $ getlisting
+		current_sorting = show . sorting $ getlisting
+		vars = catMaybes $ [
 			fmap (("limit",) . show) (limit getlisting)
 			]
-	interpretR _ =
-		join
-		. fmap sequence
-		. (fmap . fmap) (parse parseJSON)
-		. maybeToResult "Pre-parsing error"
-		. sequence
-		. (^.. key "data" . key "children" . traverseArray . key "data")
-		. Just
-
+		interpret json = do
+			listingJson <- maybeToResult "Listing not found" $
+				json ^? key "data" . key "children"
+			let commentJsons = listingJson ^.. values . key "data"
+			forM commentJsons $ \comment -> parse parseJSON comment
 
 -- Parsing instances
 instance FromJSON Link where
