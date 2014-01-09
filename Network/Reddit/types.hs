@@ -7,8 +7,8 @@ import Data.String
 
 -- Types
 data RedditName a = RedditName {getName :: RedditID}
-nullRedditName :: Show (RedditName a) => RedditName a -> RedditName ()
-nullRedditName = RedditName . show
+forgetType :: Show (RedditName a) => RedditName a -> RedditName ()
+forgetType = RedditName . show
 type RedditID = String
 
 instance Show (RedditName Link) where
