@@ -28,6 +28,7 @@ instance Functor (RedditF a) where
 	fmap f (Fetch i handler) = Fetch i (f . handler)
 	fmap f (Act i handler) = Act i (f . handler)
 	fmap f (WithLogin m poster) = WithLogin m (fmap f poster)
+	fmap f (LiftIO action) = LiftIO . fmap f $ action
 
 type Reddit r a = Free (RedditF r) a
 type StdBrowserAction a = BrowserAction (HTTP.HandleStream String) a
@@ -57,6 +58,7 @@ customToBrowserAction :: FromRedditOptions -> Reddit () a -> StdBrowserAction (R
 customToBrowserAction ops = getResultT' . iterM run
 	where
 		run (Fetch i handler) = ResultT' (fetch i) >>= handler
+		run (LiftIO action) = ResultT' (fmap return (liftIO action)) >>= id
 		run (WithLogin modhash logged) = case logged of
 			(Fetch i handler) -> ResultT' (fetch i) >>= handler
 			(Act i handler) -> ResultT' (act modhash i) >>= handler
