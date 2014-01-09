@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, RankNTypes, MultiParamTypeClasses, FunctionalDependencies, EmptyDataDecls, FlexibleInstances #-}
+{-# LANGUAGE GADTs, RankNTypes, EmptyDataDecls, FlexibleInstances, TypeFamilies #-}
 module Network.Reddit.Monad where
 
 import Control.Monad.Free
@@ -11,18 +11,18 @@ import Network.Browser
 
 data RequiresLogin
 data RedditF requires next where
-	Fetch :: (RedditFetch i o)  => i -> (o -> next) -> RedditF a next
-	Act :: (RedditAct i o) => i -> (o -> next) -> RedditF RequiresLogin next
+	Fetch :: (RedditFetch i)  => i -> (FetchResponse i -> next) -> RedditF a next
+	Act :: (RedditAct i) => i -> (ActResponse i -> next) -> RedditF RequiresLogin next
 	WithLogin  :: String -> RedditF RequiresLogin next -> RedditF () next
 	LiftIO :: IO a -> RedditF r a
-	
-   
 
-class RedditFetch i o | i -> o where
-	fetch :: i -> StdBrowserAction (Result o)
+class RedditFetch i where
+	type FetchResponse i
+	fetch :: i -> StdBrowserAction (Result (FetchResponse i))
 
-class RedditAct i o | i -> o where
-	act :: String -> i -> StdBrowserAction (Result o)
+class RedditAct i where
+	type ActResponse i
+	act :: String -> i -> StdBrowserAction (Result (ActResponse i))
 
 instance Functor (RedditF a) where
 	fmap f (Fetch i handler) = Fetch i (f . handler)

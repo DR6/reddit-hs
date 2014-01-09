@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, OverloadedStrings, FlexibleInstances, TupleSections, TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies, OverloadedStrings, FlexibleInstances, TupleSections, TemplateHaskell #-}
 
 module Network.Reddit.Instances where
 
@@ -71,36 +71,39 @@ post = HTTP.postRequest . show
 
 -- RedditInteraction instances together with their associated types
 newtype LinkOnly = LinkOnly {getLinkOnly :: RedditName Link}
-instance RedditFetch LinkOnly Link where
-     fetch link = fmap (>>= interpret) . value_from_request . get . redditURI False . asjson . path getlink $ nullURI
-          where
-		getlink = "by_id/"++ linkid
-		linkid = show . getLinkOnly $ link
-		interpret json = do
-			linkJson <- maybeToResult "Error extracting link" $
-				json ^? key "data" . key "children" . nth 0 . key "data"
-			parse parseJSON linkJson
+instance RedditFetch LinkOnly where
+	type FetchResponse LinkOnly = Link
+	fetch link = fmap (>>= interpret) . value_from_request . get . redditURI False . asjson . path getlink $ nullURI
+		where
+			getlink = "by_id/"++ linkid
+			linkid = show . getLinkOnly $ link
+			interpret json = do
+				linkJson <- maybeToResult "Error extracting link" $
+					json ^? key "data" . key "children" . nth 0 . key "data"
+				parse parseJSON linkJson
 
 newtype LinkWithComments = LinkWithComments {getLinkWithComments :: RedditName Link}
-instance RedditFetch LinkWithComments (Link, [Comment], Maybe (Reddit () [Comment])) where
-    fetch link = fmap (>>= interpret) . value_from_request . get . redditURI False . asjson . path getlink $ nullURI
-         where
-		getlink = "comments/" ++ linkid
-		linkid = show . getLinkWithComments $ link
-		interpret json = do
-			linkJson <- maybeToResult "Error extracting link" $
-				json ^? nth 0 . key "data" . key "children" . nth 0 . key "data"
-			commentsJson <- maybeToResult "Error extracting comments" $ 
-				json ^? nth 1 . key "data" . key "children"
-			unloadedCommentsJson <- Success Nothing -- TI
-			link <- parse parseJSON linkJson
-			comments <- parse parseJSON commentsJson
-			unloadedComments <- Success Nothing -- TI
-			return (link, comments, unloadedComments)
+instance RedditFetch LinkWithComments where
+	type FetchResponse LinkWithComments = (Link, [Comment], Maybe (Reddit () [Comment]))
+	fetch link = fmap (>>= interpret) . value_from_request . get . redditURI False . asjson . path getlink $ nullURI
+		where
+			getlink = "comments/" ++ linkid
+			linkid = show . getLinkWithComments $ link
+			interpret json = do
+				linkJson <- maybeToResult "Error extracting link" $
+					json ^? nth 0 . key "data" . key "children" . nth 0 . key "data"
+				commentsJson <- maybeToResult "Error extracting comments" $ 
+					json ^? nth 1 . key "data" . key "children"
+				unloadedCommentsJson <- Success Nothing -- TI
+				link <- parse parseJSON linkJson
+				comments <- parse parseJSON commentsJson
+				unloadedComments <- Success Nothing -- TI
+				return (link, comments, unloadedComments)
 
 
 data Login = Login String String -- Username and password
-instance RedditFetch Login String where
+instance RedditFetch Login where
+	type FetchResponse Login = String
 	fetch (Login un pw) = fmap (>>= interpret) . value_from_request . post . redditURI False . path ("api/login/"++un) . query vars $ nullURI
 	     where
 			vars = [("user",un),("password",pw),("api_type","json")]
@@ -111,7 +114,8 @@ instance RedditFetch Login String where
 
 
 data MeRequest = MeRequest
-instance RedditAct MeRequest Account where
+instance RedditAct MeRequest where
+	type ActResponse MeRequest = Account
 	act _ _ = fmap (>>= interpret) . value_from_request . HTTP.getRequest $ "http://www.reddit.com/api/me.json"
 		where
 			interpret json = do
@@ -121,7 +125,8 @@ instance RedditAct MeRequest Account where
 
 
 data MakeComment = MakeComment {text :: String, target_id :: RedditName ()}
-instance RedditAct MakeComment Value where
+instance RedditAct MakeComment where
+	type ActResponse MakeComment = Value
 	act m comment = fmap (>>= interpret) . value_from_request . post . redditURI False . path "api/comment" . query vars $ nullURI
 	    where
 		vars = [("api_type","json"), ("text",text comment), ("thing_id",show . target_id $ comment), ("uh",m)]
@@ -129,7 +134,8 @@ instance RedditAct MakeComment Value where
 
 
 newtype SubredditInfo = SubredditInfo {getSubredditInfo :: String}
-instance RedditFetch SubredditInfo Subreddit where
+instance RedditFetch SubredditInfo where
+	type FetchResponse SubredditInfo = Subreddit
 	fetch sub = fmap (>>= interpret) . value_from_request . get . redditURI False . asjson . path aboutpath $ nullURI
 	    where
 		aboutpath = getSubredditInfo sub ++ "about.json"
@@ -155,7 +161,8 @@ data GetLinkListing = GetLinkListing {
 	-- target
 
 defGetListing sub sort = GetLinkListing sub Nothing sort Nothing
-instance RedditFetch GetLinkListing [Link] where
+instance RedditFetch GetLinkListing where
+	type FetchResponse GetLinkListing = [Link]
 	fetch getlisting = fmap (>>= interpret) . value_from_request . get . path (usubreddit ++ current_sorting) . query vars $ nullURI
 	    where
 		usubreddit = maybe "" id . fromsubreddit $ getlisting
