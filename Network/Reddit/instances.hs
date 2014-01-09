@@ -19,8 +19,11 @@ import Control.Monad
 import Control.Arrow
 import Data.Maybe(fromJust, catMaybes)
 import Control.Lens.TH
+import Debug.Trace
 
 -- Unspecific utility functions
+traceShow :: Show a => a -> a
+traceShow a = trace (show a) a
 convert :: (Enum a, Enum b) => a -> b
 convert = toEnum . fromEnum
 constructEither :: Maybe a -> Maybe b -> Maybe (Either a b)
@@ -28,7 +31,6 @@ constructEither (Just left) _ = Just . Left $ left
 constructEither _ (Just right) = Just . Right $ right
 constructEither _ _ = Nothing
 maybeToResult s = maybe (Error s) (Success)
-
 
 -- URI handling
 $(makeLensesFor [("uriScheme","_uriScheme"),
@@ -55,7 +57,8 @@ query attrs = (_uriQuery .~ HTTP.urlEncodeVars attrs)
 -- Specific utility functions
 value_from_request :: HTTP.Request_String -> StdBrowserAction (Result Value)
 value_from_request = 
-	fmap (maybeToResult "Decoding error" 
+	fmap (maybeToResult "Decoding error"
+               . traceShow
 		. decode 
 		. L.pack
 		. map convert
@@ -104,13 +107,13 @@ instance RedditFetch LinkWithComments where
 data Login = Login String String -- Username and password
 instance RedditFetch Login where
 	type FetchResponse Login = String
-	fetch (Login un pw) = fmap (>>= interpret) . value_from_request . post . redditURI False . path ("api/login/"++un) . query vars $ nullURI
+	fetch (Login un pw) = fmap (>>= interpret) . value_from_request . post . redditURI False . path ("api/login/"++un++"?") . query vars $ nullURI
 	     where
-			vars = [("user",un),("password",pw),("api_type","json")]
+			vars = [("user",un),("passwd",pw),("api_type","json")]
 			interpret json = do
-				loginJson <- maybeToResult "Error extracting modhash" $
-					json ^? key "json" . key "data" . key "modhash"
-				parse parseJSON loginJson
+				modhash <- maybeToResult "Error extracting modhash" $
+					json ^? key "json" . key "data" . key "modhash" . _String
+				return $ show modhash
 
 
 data MeRequest = MeRequest
