@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, OverloadedStrings, FlexibleInstances, TupleSections, TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies, OverloadedStrings, FlexibleInstances, TemplateHaskell, TupleSections #-}
 
 module Network.Reddit.Instances where
 
@@ -13,6 +13,7 @@ import qualified Data.ByteString.Lazy as L
 import qualified Network.HTTP as HTTP
 import Network.URI hiding (path, query)
 import Network.Browser
+import Data.Tree
 
 import Control.Applicative
 import Control.Monad
@@ -86,23 +87,36 @@ instance RedditFetch LinkOnly where
 				parse parseJSON linkJson
 
 newtype LinkWithComments = LinkWithComments {getLinkWithComments :: RedditName Link}
+type CommentForest = Forest (Either Comment More)
+data More = More {
+	link :: RedditName Link,
+	children :: [RedditName Comment]}
 instance RedditFetch LinkWithComments where
-	type FetchResponse LinkWithComments = (Link, [Comment], Maybe (Reddit () [Comment]))
+	type FetchResponse LinkWithComments = (Link, CommentForest)
 	fetch link = fmap (>>= interpret) . value_from_request . get . redditURI False . asjson . path getlink $ nullURI
 		where
 			getlink = "comments/" ++ linkid
 			linkid = show . getLinkWithComments $ link
+			makeTree json = do
+				kind <- maybeToResult "Value with no kind" $
+					json ^? key "kind"
+				data' <- maybeToResult "Value with no data" $
+					json ^? key "data"
+				case kind of
+					"t1" -> do
+						comment <- parse parseJSON data'
+						children <- return $ data' ^.. key "replies" . values . key "data" . key "children"
+						return (Right comment, children)
+					"more" -> parse parseJSON data' >>= \more -> return (Left more, [])				
 			interpret json = do
 				linkJson <- maybeToResult "Error extracting link" $
 					json ^? nth 0 . key "data" . key "children" . nth 0 . key "data"
-				commentsJson <- maybeToResult "Error extracting comments" $ 
+				firstLayerJson <- maybeToResult "Error extracting comments" $ 
 					json ^? nth 1 . key "data" . key "children"
-				unloadedCommentsJson <- Success Nothing -- TI
+				firstLayer <- return $ firstLayerJson ^.. values
 				link <- parse parseJSON linkJson
-				comments <- parse parseJSON commentsJson
-				unloadedComments <- Success Nothing -- TI
-				return (link, comments, unloadedComments)
-
+				comments <- unfoldForestM makeTree firstLayer
+				return (link, comments)
 
 data Login = Login String String -- Username and password
 instance RedditFetch Login where
@@ -272,3 +286,9 @@ instance FromJSON Subreddit where
 		<*> o .: "subscribers"
 		<*> o .: "title"
 		<*> o .: "url")
+	parseJSON _ = mzero
+
+instance FromJSON More where
+	parseJSON (Object o) = (More
+		<$> fmap (RedditName . drop 3) (o .: "parent_id")
+		<*> (fmap . fmap) (RedditName . drop 3) (o .: "children"))
