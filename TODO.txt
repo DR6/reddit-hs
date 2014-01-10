@@ -15,4 +15,3 @@ Posting functionality missing: only comments can be added
 Implement rest of the API
 
 Strings should be avoided
-LinkWithComment's interpretR needs to be written more clearly
