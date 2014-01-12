@@ -59,7 +59,6 @@ query attrs = (_uriQuery .~ HTTP.urlEncodeVars attrs)
 value_from_request :: HTTP.Request_String -> StdBrowserAction (Result Value)
 value_from_request = 
 	fmap (maybeToResult "Decoding error"
-               . traceShow
 		. decode 
 		. L.pack
 		. map convert
@@ -90,13 +89,13 @@ newtype LinkWithComments = LinkWithComments {getLinkWithComments :: RedditName L
 type CommentForest = Forest (Either Comment More)
 data More = More {
 	link :: RedditName Link,
-	children :: [RedditName Comment]}
+	children :: [RedditName Comment]} deriving Show
 instance RedditFetch LinkWithComments where
 	type FetchResponse LinkWithComments = (Link, CommentForest)
 	fetch link = fmap (>>= interpret) . value_from_request . get . redditURI False . asjson . path getlink $ nullURI
 		where
 			getlink = "comments/" ++ linkid
-			linkid = show . getLinkWithComments $ link
+			linkid = drop 3 . show . getLinkWithComments $ link
 			makeTree json = do
 				kind <- maybeToResult "Value with no kind" $
 					json ^? key "kind"
