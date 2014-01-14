@@ -52,7 +52,7 @@ instance Monad m => Monad (ResultT' m) where
 	return = ResultT' . return . return
 	(ResultT' m) >>= f = ResultT' $ m >>= \intermediate -> case intermediate of
 		Success a -> getResultT' . f $ a
-		Error str -> return $ Error "str"
+		Error str -> return $ Error str
 
 customToBrowserAction :: FromRedditOptions -> Reddit () a -> StdBrowserAction (Result a)
 customToBrowserAction ops = getResultT' . iterM run

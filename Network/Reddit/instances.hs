@@ -25,6 +25,7 @@ import Debug.Trace
 -- Unspecific utility functions
 traceShow :: Show a => a -> a
 traceShow a = trace (show a) a
+traceString s = trace s s
 convert :: (Enum a, Enum b) => a -> b
 convert = toEnum . fromEnum
 constructEither :: Maybe a -> Maybe b -> Maybe (Either a b)
@@ -86,7 +87,7 @@ instance RedditFetch LinkOnly where
 				parse parseJSON linkJson
 
 newtype LinkWithComments = LinkWithComments {getLinkWithComments :: RedditName Link}
-type CommentForest = Forest (Either Comment More)
+type CommentForest = Forest (Either More Comment)
 data More = More {
 	link :: RedditName Link,
 	children :: [RedditName Comment]} deriving Show
@@ -104,9 +105,9 @@ instance RedditFetch LinkWithComments where
 				case kind of
 					"t1" -> do
 						comment <- parse parseJSON data'
-						children <- return $ data' ^.. key "replies" . values . key "data" . key "children"
+						children <- return $ data' ^.. key "replies" . key "data" . key "children" . values
 						return (Right comment, children)
-					"more" -> parse parseJSON data' >>= \more -> return (Left more, [])				
+					"more" -> parse parseJSON data' >>= \more -> return (Left more, [])
 			interpret json = do
 				linkJson <- maybeToResult "Error extracting link" $
 					json ^? nth 0 . key "data" . key "children" . nth 0 . key "data"
@@ -179,7 +180,7 @@ data GetLinkListing = GetLinkListing {
 defGetListing sub sort = GetLinkListing sub Nothing sort Nothing
 instance RedditFetch GetLinkListing where
 	type FetchResponse GetLinkListing = [Link]
-	fetch getlisting = fmap (>>= interpret) . value_from_request . get . path (usubreddit ++ current_sorting) . query vars $ nullURI
+	fetch getlisting = fmap (>>= interpret) . value_from_request . get . redditURI False . path (usubreddit ++ current_sorting) . query vars $ nullURI
 	    where
 		usubreddit = maybe "" id . fromsubreddit $ getlisting
 		current_sorting = show . sorting $ getlisting
@@ -225,12 +226,11 @@ instance FromJSON Comment where
     	<*> (fmap (RedditName . drop 3) (o .: "name"))
         <*> parseJSON (Object o)
         <*> parseJSON (Object o)
-        <*> o .: "banned_by"
+        <*> o .:? "banned_by"
         <*> ((,)
-        	<$> o .: "body_markdown"
-        	<*> o .: "body.html")
+        	<$> o .: "body"
+        	<*> o .: "body_html")
         <*> fmap (RedditName . drop 3) (o .: "link_id")
-        <*> (o .: "link_title")
         <*> (o .:? "num_reports")
         <*> (o .: "parent_id"))
 
@@ -250,7 +250,7 @@ instance FromJSON Votes where
     parseJSON (Object o) = (Votes
 	    <$> o .: "ups"
 	    <*> o .: "downs"
-	    <*> o .: "likes")
+	    <*> o .:? "likes")
     parseJSON _ = mzero
 
 instance FromJSON Account where

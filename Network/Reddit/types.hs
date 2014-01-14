@@ -53,10 +53,9 @@ data Comment = Comment {
     comment_info :: ContentInfo,
     comment_votes :: Votes,
     --comment_created :: CreatedInfo,
-    banned_by :: String,
+    banned_by :: Maybe String,
     body :: (String,String),
     link_id :: RedditName Link,
-    link_title :: String,
     num_reports :: Maybe Int,
     parent_id :: RedditID} deriving Show
 
