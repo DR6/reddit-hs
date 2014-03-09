@@ -13,7 +13,7 @@ data RequiresLogin
 data RedditF requires next where
 	Fetch :: (RedditRequest i)  => i -> (RedditResponse i -> next) -> RedditF a next
 	Act :: (AuthRedditRequest i) => i -> (ActResponse i -> next) -> RedditF RequiresLogin next
-	WithLogin  :: String -> RedditF RequiresLogin next -> RedditF () next
+	WithLogin :: String -> Reddit RequiresLogin next -> RedditF () next
 	LiftIO :: IO a -> RedditF r a
 
 class RedditRequest i where
@@ -47,21 +47,22 @@ defInitializer = do
 	setUserAgent "haskell reddit API wrapper, still in early development"
 
 
-newtype ResultT' m a = ResultT' {getResultT' :: (m (Result a))}
-instance Monad m => Monad (ResultT' m) where
-	return = ResultT' . return . return
-	(ResultT' m) >>= f = ResultT' $ m >>= \intermediate -> case intermediate of
-		Success a -> getResultT' . f $ a
+newtype ResultT m a = ResultT {getResultT :: (m (Result a))}
+instance Monad m => Monad (ResultT m) where
+	return = ResultT . return . return
+	(ResultT m) >>= f = ResultT $ m >>= \intermediate -> case intermediate of
+		Success a -> getResultT . f $ a
 		Error str -> return $ Error str
 
 customToBrowserAction :: FromRedditOptions -> Reddit () a -> StdBrowserAction (Result a)
-customToBrowserAction ops = getResultT' . iterM run
-	where
-		run (Fetch i handler) = ResultT' (redditRequest i) >>= handler
-		run (LiftIO action) = ResultT' (fmap return (liftIO action)) >>= id
-		run (WithLogin modhash logged) = case logged of
-			(Fetch i handler) -> ResultT' (redditRequest i) >>= handler
-			(Act i handler) -> ResultT' (redditRequest' modhash i) >>= handler
+customToBrowserAction ops = getResultT . iterM run
+    where
+        run (Fetch i handler) = ResultT (redditRequest i) >>= handler
+        run (LiftIO action) = ResultT (fmap return (liftIO action)) >>= id
+        run (WithLogin modhash logged) = id =<< iterM (runModhash modhash) logged
+        runModhash modhash (Act i handler) = ResultT (redditRequest' modhash i) >>= handler
+        runModhash _ (Fetch i handler) = ResultT (redditRequest i) >>= handler
+        runModhash _ (LiftIO action) = ResultT (fmap return (liftIO action)) >>= id
 
 toBrowserAction = customToBrowserAction defOptions
 customPerformReddit initializer ops = browse . (initializer>>) . customToBrowserAction ops
