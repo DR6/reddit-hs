@@ -47,7 +47,7 @@ defInitializer = do
 	setUserAgent "haskell reddit API wrapper, still in early development"
 
 
-newtype ResultT' m a = ResultT' {getResultT' :: (m (Result a))} -- this is not a conventional monad transformer, as it is "inverted"
+newtype ResultT' m a = ResultT' {getResultT' :: (m (Result a))}
 instance Monad m => Monad (ResultT' m) where
 	return = ResultT' . return . return
 	(ResultT' m) >>= f = ResultT' $ m >>= \intermediate -> case intermediate of
@@ -61,7 +61,7 @@ customToBrowserAction ops = getResultT' . iterM run
 		run (LiftIO action) = ResultT' (fmap return (liftIO action)) >>= id
 		run (WithLogin modhash logged) = case logged of
 			(Fetch i handler) -> ResultT' (redditRequest i) >>= handler
-			(Act i handler) -> ResultT' (act modhash i) >>= handler
+			(Act i handler) -> ResultT' (redditRequest' modhash i) >>= handler
 
 toBrowserAction = customToBrowserAction defOptions
 customPerformReddit initializer ops = browse . (initializer>>) . customToBrowserAction ops
