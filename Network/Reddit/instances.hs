@@ -75,9 +75,9 @@ post = HTTP.postRequest . show
 
 -- RedditInteraction instances together with their associated types
 newtype LinkOnly = LinkOnly {getLinkOnly :: RedditName Link}
-instance RedditFetch LinkOnly where
-	type FetchResponse LinkOnly = Link
-	fetch link = fmap (>>= interpret) . value_from_request . get . redditURI False . asjson . path getlink $ nullURI
+instance RedditRequest LinkOnly where
+	type RedditResponse LinkOnly = Link
+	redditRequest link = fmap (>>= interpret) . value_from_request . get . redditURI False . asjson . path getlink $ nullURI
 		where
 			getlink = "by_id/"++ linkid
 			linkid = show . getLinkOnly $ link
@@ -91,9 +91,9 @@ type CommentForest = Forest (Either More Comment)
 data More = More {
 	link :: RedditName Link,
 	children :: [RedditName Comment]} deriving Show
-instance RedditFetch LinkWithComments where
-	type FetchResponse LinkWithComments = (Link, CommentForest)
-	fetch link = fmap (>>= interpret) . value_from_request . get . redditURI False . asjson . path getlink $ nullURI
+instance RedditRequest LinkWithComments where
+	type RedditResponse LinkWithComments = (Link, CommentForest)
+	redditRequest link = fmap (>>= interpret) . value_from_request . get . redditURI False . asjson . path getlink $ nullURI
 		where
 			getlink = "comments/" ++ linkid
 			linkid = drop 3 . show . getLinkWithComments $ link
@@ -119,9 +119,9 @@ instance RedditFetch LinkWithComments where
 				return (link, comments)
 
 data Login = Login String String -- Username and password
-instance RedditFetch Login where
-	type FetchResponse Login = String
-	fetch (Login un pw) = fmap (>>= interpret) . value_from_request . post . redditURI False . path ("api/login/"++un++"?") . query vars $ nullURI
+instance RedditRequest Login where
+	type RedditResponse Login = String
+	redditRequest (Login un pw) = fmap (>>= interpret) . value_from_request . post . redditURI False . path ("api/login/"++un++"?") . query vars $ nullURI
 	     where
 			vars = [("user",un),("passwd",pw),("api_type","json")]
 			interpret json = do
@@ -131,9 +131,9 @@ instance RedditFetch Login where
 
 
 data MeRequest = MeRequest
-instance RedditAct MeRequest where
+instance AuthRedditRequest MeRequest where
 	type ActResponse MeRequest = Account
-	act _ _ = fmap (>>= interpret) . value_from_request . HTTP.getRequest $ "http://www.reddit.com/api/me.json"
+	redditRequest' _ _ = fmap (>>= interpret) . value_from_request . HTTP.getRequest $ "http://www.reddit.com/api/me.json"
 		where
 			interpret json = do
 				meJson <- maybeToResult "Error extracting user information" $
@@ -142,18 +142,18 @@ instance RedditAct MeRequest where
 
 
 data MakeComment = MakeComment {text :: String, target_id :: RedditName ()}
-instance RedditAct MakeComment where
+instance AuthRedditRequest MakeComment where
 	type ActResponse MakeComment = Value
-	act m comment = fmap (>>= interpret) . value_from_request . post . redditURI False . path "api/comment" . query vars $ nullURI
+	redditRequest' m comment = fmap (>>= interpret) . value_from_request . post . redditURI False . path "api/comment" . query vars $ nullURI
 	    where
 		vars = [("api_type","json"), ("text",text comment), ("thing_id",show . target_id $ comment), ("uh",m)]
 		interpret = Success
 
 
 newtype SubredditInfo = SubredditInfo {getSubredditInfo :: String}
-instance RedditFetch SubredditInfo where
-	type FetchResponse SubredditInfo = Subreddit
-	fetch sub = fmap (>>= interpret) . value_from_request . get . redditURI False . asjson . path aboutpath $ nullURI
+instance RedditRequest SubredditInfo where
+	type RedditResponse SubredditInfo = Subreddit
+	redditRequest sub = fmap (>>= interpret) . value_from_request . get . redditURI False . asjson . path aboutpath $ nullURI
 	    where
 		aboutpath = getSubredditInfo sub ++ "about.json"
 		interpret json = do
@@ -178,9 +178,9 @@ data GetLinkListing = GetLinkListing {
 	-- target
 
 defGetListing sub sort = GetLinkListing sub Nothing sort Nothing
-instance RedditFetch GetLinkListing where
-	type FetchResponse GetLinkListing = [Link]
-	fetch getlisting = fmap (>>= interpret) . value_from_request . get . redditURI False . path (usubreddit ++ current_sorting) . query vars $ nullURI
+instance RedditRequest GetLinkListing where
+	type RedditResponse GetLinkListing = [Link]
+	redditRequest getlisting = fmap (>>= interpret) . value_from_request . get . redditURI False . path (usubreddit ++ current_sorting) . query vars $ nullURI
 	    where
 		usubreddit = maybe "" id . fromsubreddit $ getlisting
 		current_sorting = show . sorting $ getlisting

@@ -11,18 +11,18 @@ import Network.Browser
 
 data RequiresLogin
 data RedditF requires next where
-	Fetch :: (RedditFetch i)  => i -> (FetchResponse i -> next) -> RedditF a next
-	Act :: (RedditAct i) => i -> (ActResponse i -> next) -> RedditF RequiresLogin next
+	Fetch :: (RedditRequest i)  => i -> (RedditResponse i -> next) -> RedditF a next
+	Act :: (AuthRedditRequest i) => i -> (ActResponse i -> next) -> RedditF RequiresLogin next
 	WithLogin  :: String -> RedditF RequiresLogin next -> RedditF () next
 	LiftIO :: IO a -> RedditF r a
 
-class RedditFetch i where
-	type FetchResponse i
-	fetch :: i -> StdBrowserAction (Result (FetchResponse i))
+class RedditRequest i where
+	type RedditResponse i
+	redditRequest :: i -> StdBrowserAction (Result (RedditResponse i))
 
-class RedditAct i where
+class AuthRedditRequest i where
 	type ActResponse i
-	act :: String -> i -> StdBrowserAction (Result (ActResponse i))
+	redditRequest' :: String -> i -> StdBrowserAction (Result (ActResponse i))
 
 instance Functor (RedditF a) where
 	fmap f (Fetch i handler) = Fetch i (f . handler)
@@ -57,10 +57,10 @@ instance Monad m => Monad (ResultT' m) where
 customToBrowserAction :: FromRedditOptions -> Reddit () a -> StdBrowserAction (Result a)
 customToBrowserAction ops = getResultT' . iterM run
 	where
-		run (Fetch i handler) = ResultT' (fetch i) >>= handler
+		run (Fetch i handler) = ResultT' (redditRequest i) >>= handler
 		run (LiftIO action) = ResultT' (fmap return (liftIO action)) >>= id
 		run (WithLogin modhash logged) = case logged of
-			(Fetch i handler) -> ResultT' (fetch i) >>= handler
+			(Fetch i handler) -> ResultT' (redditRequest i) >>= handler
 			(Act i handler) -> ResultT' (act modhash i) >>= handler
 
 toBrowserAction = customToBrowserAction defOptions
