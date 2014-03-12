@@ -18,4 +18,4 @@ cabal-version:       >=1.8
 library
   exposed-modules:     Network.Reddit
   -- other-modules:       
-  build-depends:       base ==4.6.*, HTTP >=2.8, free >=4.2, lens-aeson>=0.1.2, aeson>=0.6.2.1, lens >=3.10.1, network >=2.4.1.2, bytestring >=0.10.0.2, time >=1.4.0.1, transformers >=0.3
+  build-depends:       base , HTTP, free, lens-aeson, aeson, lens, network, bytestring, time, transformers, containers
