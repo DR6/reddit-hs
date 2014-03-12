@@ -4,6 +4,7 @@ module Network.Reddit.Instances where
 
 import Network.Reddit.Types
 import Network.Reddit.Monad
+import Network.Reddit.Requests
 
 import Data.Aeson
 import Control.Lens
@@ -74,7 +75,6 @@ post = HTTP.postRequest . show
 
 
 -- RedditInteraction instances together with their associated types
-newtype LinkOnly = LinkOnly {getLinkOnly :: RedditName Link}
 instance RedditRequest LinkOnly where
 	type RedditResponse LinkOnly = Link
 	redditRequest link = fmap (>>= interpret) . value_from_request . get . redditURI False . asjson . path getlink $ nullURI
@@ -86,11 +86,6 @@ instance RedditRequest LinkOnly where
 					json ^? key "data" . key "children" . nth 0 . key "data"
 				parse parseJSON linkJson
 
-newtype LinkWithComments = LinkWithComments {getLinkWithComments :: RedditName Link}
-type CommentForest = Forest (Either More Comment)
-data More = More {
-	link :: RedditName Link,
-	children :: [RedditName Comment]} deriving Show
 instance RedditRequest LinkWithComments where
 	type RedditResponse LinkWithComments = (Link, CommentForest)
 	redditRequest link = fmap (>>= interpret) . value_from_request . get . redditURI False . asjson . path getlink $ nullURI
@@ -118,7 +113,6 @@ instance RedditRequest LinkWithComments where
 				comments <- unfoldForestM makeTree firstLayer
 				return (link, comments)
 
-data Login = Login String String -- Username and password
 instance RedditRequest Login where
 	type RedditResponse Login = String
 	redditRequest (Login un pw) = fmap (>>= interpret) . value_from_request . post . redditURI False . path ("api/login/"++un++"?") . query vars $ nullURI
@@ -129,8 +123,6 @@ instance RedditRequest Login where
 					json ^? key "json" . key "data" . key "modhash" . _String
 				return $ show modhash
 
-
-data MeRequest = MeRequest
 instance AuthRedditRequest MeRequest where
 	type ActResponse MeRequest = Account
 	redditRequest' _ _ = fmap (>>= interpret) . value_from_request . HTTP.getRequest $ "http://www.reddit.com/api/me.json"
@@ -140,8 +132,6 @@ instance AuthRedditRequest MeRequest where
 					json ^? key "data"
 				parse parseJSON meJson
 
-
-data MakeComment = MakeComment {text :: String, target_id :: RedditName ()}
 instance AuthRedditRequest MakeComment where
 	type ActResponse MakeComment = Value
 	redditRequest' m comment = fmap (>>= interpret) . value_from_request . post . redditURI False . path "api/comment" . query vars $ nullURI
@@ -149,8 +139,6 @@ instance AuthRedditRequest MakeComment where
 		vars = [("api_type","json"), ("text",text comment), ("thing_id",show . target_id $ comment), ("uh",m)]
 		interpret = Success
 
-
-newtype SubredditInfo = SubredditInfo {getSubredditInfo :: String}
 instance RedditRequest SubredditInfo where
 	type RedditResponse SubredditInfo = Subreddit
 	redditRequest sub = fmap (>>= interpret) . value_from_request . get . redditURI False . asjson . path aboutpath $ nullURI
@@ -161,23 +149,6 @@ instance RedditRequest SubredditInfo where
 				json ^? key "data"
 			parse parseJSON subJson
 
-data TimeSpan = Hour | Day | Week | Month | Year | All
-data Sorting = Hot | New | Top TimeSpan | Controversial TimeSpan
-instance Show Sorting where
-	show Hot = "/hot"
-	show New = "/new"
-	show (Top _) = "/top"
-	show (Controversial _) = "/controversial"
-data GetLinkListing = GetLinkListing {
-	fromsubreddit :: Maybe String,
-	range :: Maybe (RedditRange Link),
-	sorting :: Sorting,
-	-- count
-	limit :: Maybe Int}
-	-- show
-	-- target
-
-defGetListing sub sort = GetLinkListing sub Nothing sort Nothing
 instance RedditRequest GetLinkListing where
 	type RedditResponse GetLinkListing = [Link]
 	redditRequest getlisting = fmap (>>= interpret) . value_from_request . get . redditURI False . path (usubreddit ++ current_sorting) . query vars $ nullURI

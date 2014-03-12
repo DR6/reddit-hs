@@ -24,7 +24,7 @@ class AuthRedditRequest i where
 	type ActResponse i
 	redditRequest' :: String -> i -> StdBrowserAction (Result (ActResponse i))
 
-instance Functor (RedditF a) where
+instance Functor (RedditF r) where
 	fmap f (Fetch i handler) = Fetch i (f . handler)
 	fmap f (Act i handler) = Act i (f . handler)
 	fmap f (WithLogin m poster) = WithLogin m (fmap f poster)
