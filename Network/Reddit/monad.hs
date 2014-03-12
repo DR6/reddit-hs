@@ -13,7 +13,7 @@ data RequiresLogin
 data RedditF requires next where
 	Fetch :: (RedditRequest i)  => i -> (RedditResponse i -> next) -> RedditF a next
 	Act :: (AuthRedditRequest i) => i -> (ActResponse i -> next) -> RedditF RequiresLogin next
-	WithLogin :: String -> Reddit RequiresLogin next -> RedditF () next
+	WithModhash :: String -> Reddit RequiresLogin next -> RedditF () next
 	LiftIO :: IO a -> RedditF r a
 
 class RedditRequest i where
@@ -27,7 +27,7 @@ class AuthRedditRequest i where
 instance Functor (RedditF r) where
 	fmap f (Fetch i handler) = Fetch i (f . handler)
 	fmap f (Act i handler) = Act i (f . handler)
-	fmap f (WithLogin m poster) = WithLogin m (fmap f poster)
+	fmap f (WithModhash m poster) = WithModhash m (fmap f poster)
 	fmap f (LiftIO action) = LiftIO . fmap f $ action
 
 type Reddit r a = Free (RedditF r) a
@@ -59,7 +59,7 @@ customToBrowserAction ops = getResultT . iterM run
     where
         run (Fetch i handler) = ResultT (redditRequest i) >>= handler
         run (LiftIO action) = ResultT (fmap return (liftIO action)) >>= id
-        run (WithLogin modhash logged) = id =<< iterM (runModhash modhash) logged
+        run (WithModhash modhash logged) = id =<< iterM (runModhash modhash) logged
         runModhash modhash (Act i handler) = ResultT (redditRequest' modhash i) >>= handler
         runModhash _ (Fetch i handler) = ResultT (redditRequest i) >>= handler
         runModhash _ (LiftIO action) = ResultT (fmap return (liftIO action)) >>= id
