@@ -29,11 +29,7 @@ traceShow a = trace (show a) a
 traceString s = trace s s
 convert :: (Enum a, Enum b) => a -> b
 convert = toEnum . fromEnum
-constructEither :: Maybe a -> Maybe b -> Maybe (Either a b)
-constructEither (Just left) _ = Just . Left $ left
-constructEither _ (Just right) = Just . Right $ right
-constructEither _ _ = Nothing
-maybeToResult s = maybe (Error s) (Success)
+
 
 -- URI handling
 $(makeLensesFor [("uriScheme","_uriScheme"),

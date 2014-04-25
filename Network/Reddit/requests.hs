@@ -8,10 +8,6 @@ newtype LinkOnly = LinkOnly {getLinkOnly :: RedditName Link}
 newtype LinkWithComments = LinkWithComments {getLinkWithComments :: RedditName Link}
 type CommentForest = Forest (Either More Comment)
 
-data More = More {
-	link :: RedditName Link,
-	children :: [RedditName Comment]} deriving Show
-
 data Login = Login String String -- Username and password
 
 data MeRequest = MeRequest
