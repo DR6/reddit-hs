@@ -1,5 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+module Network.Reddit.Parse where
+
 import Data.Aeson
 import Control.Applicative
 import Network.Reddit.Types
